@@ -124,7 +124,6 @@ def save_to_csv(products: list[ProductItem], filepath: Path) -> Path:
         "brand_name",
         "url",
         "image_url",
-        "aliexpress_search_url",
         "scraped_at",
     ]
 
@@ -132,10 +131,6 @@ def save_to_csv(products: list[ProductItem], filepath: Path) -> Path:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for p in products:
-            # Generate AliExpress search link from title
-            aliexpress_url = (
-                f"https://www.aliexpress.com/wholesale?SearchText={quote_plus(p.title)}"
-            )
             writer.writerow(
                 {
                     "id": p.id,
@@ -149,10 +144,61 @@ def save_to_csv(products: list[ProductItem], filepath: Path) -> Path:
                     "brand_name": p.brand_name or "",
                     "url": p.url,
                     "image_url": p.image_url or "",
-                    "aliexpress_search_url": aliexpress_url,
                     "scraped_at": p.scraped_at.strftime("%Y-%m-%d %H:%M:%S"),
                 }
             )
 
     logger.info(f"Saved {len(products)} products to CSV at {filepath}")
     return filepath
+
+
+def get_saved_queries(db_path: Path) -> list[dict]:
+    """Return distinct search queries and their product counts from SQLite."""
+    if not db_path.exists():
+        return []
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    with conn:
+        rows = conn.execute(
+            """
+            SELECT search_query, COUNT(*) as count, MAX(scraped_at) as last_scraped
+            FROM products
+            WHERE search_query IS NOT NULL AND search_query != ''
+            GROUP BY search_query
+            ORDER BY last_scraped DESC
+            """
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_saved_products(
+    db_path: Path, search_query: str | None = None, limit: int = 100
+) -> list[dict]:
+    """Retrieve saved products sorted by demand score."""
+    if not db_path.exists():
+        return []
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    with conn:
+        if search_query:
+            rows = conn.execute(
+                """
+                SELECT * FROM products
+                WHERE search_query = ?
+                ORDER BY demand_score DESC, offers_count DESC, like_count DESC
+                LIMIT ?
+                """,
+                (search_query, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT * FROM products
+                ORDER BY demand_score DESC, offers_count DESC, like_count DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

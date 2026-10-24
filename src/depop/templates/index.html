@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Depop Demand Scraper — Market Research & Sourcing Tool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#fff1f2', 500: '#f43f5e', 600: '#e11d48', 700: '#be123c' },
+            dark: { 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { transition: background-color 0.15s ease, border-color 0.15s ease; }
+    .product-img { aspect-ratio: 1 / 1; object-fit: cover; }
+  </style>
+</head>
+<body class="bg-dark-950 text-slate-100 min-h-screen font-sans antialiased">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800 bg-dark-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center font-bold text-white shadow-lg shadow-rose-900/30 text-lg">
+          D
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white leading-tight">Depop Demand Scraper</h1>
+          <p class="text-xs text-slate-400">Market Research & Sourcing Intelligence (Offers, In-Bags, Likes)</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span id="globalStats" class="text-xs px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+          Ready
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- Search & Control Panel Card -->
+    <section class="bg-dark-900 rounded-2xl border border-slate-800 p-6 shadow-xl">
+      <form id="scrapeForm" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+          
+          <!-- Search Query Input -->
+          <div class="md:col-span-5 space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Search Query</span>
+            </label>
+            <input 
+              type="text" 
+              id="queryInput" 
+              name="query" 
+              placeholder="e.g. baggy jeans, vintage leather jacket, cargo pants..." 
+              required
+              class="w-full bg-dark-950 border border-slate-700 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none"
+            >
+          </div>
+
+          <!-- Top N -->
+          <div class="md:col-span-2 space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Top Items</span>
+            </label>
+            <input 
+              type="number" 
+              id="topInput" 
+              name="top" 
+              value="20" 
+              min="1" 
+              max="100" 
+              class="w-full bg-dark-950 border border-slate-700 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-xl px-3 py-2.5 text-sm text-white outline-none"
+            >
+          </div>
+
+          <!-- Min Likes -->
+          <div class="md:col-span-2 space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Min Likes</span>
+            </label>
+            <input 
+              type="number" 
+              id="minLikesInput" 
+              name="min_likes" 
+              value="5" 
+              min="0" 
+              max="500" 
+              class="w-full bg-dark-950 border border-slate-700 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-xl px-3 py-2.5 text-sm text-white outline-none"
+            >
+          </div>
+
+          <!-- Action Button -->
+          <div class="md:col-span-3 flex items-center gap-3">
+            <button 
+              type="submit" 
+              id="submitBtn"
+              class="w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-semibold py-2.5 px-5 rounded-xl shadow-lg shadow-rose-950/50 hover:shadow-rose-900/60 active:scale-[0.98] transition flex items-center justify-center gap-2 text-sm"
+            >
+              <span id="btnText">Start Scraping</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Quick Test Mode and Status Bar -->
+        <div class="flex flex-wrap items-center justify-between pt-2 text-xs text-slate-400 border-t border-slate-800/80 gap-3">
+          <label class="inline-flex items-center cursor-pointer select-none">
+            <input type="checkbox" id="testModeInput" class="rounded bg-dark-950 border-slate-700 text-rose-600 focus:ring-rose-500 h-4 w-4">
+            <span class="ml-2 text-slate-300">Test Mode (Quick 16 items without full pagination)</span>
+          </label>
+          <div id="statusMessage" class="hidden text-amber-400 font-medium animate-pulse flex items-center gap-1.5">
+            <span>Scraping and analyzing demand metrics... Please wait (~15-30s)</span>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Collections & Filter Bar -->
+    <section class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-dark-900/60 p-4 rounded-2xl border border-slate-800">
+      
+      <!-- Collection History Selector -->
+      <div class="flex items-center space-x-3">
+        <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Collection:</label>
+        <select 
+          id="collectionSelect" 
+          class="bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-rose-500"
+        >
+          <option value="">Loading saved collections...</option>
+        </select>
+        <button 
+          id="refreshCollectionsBtn" 
+          title="Refresh Collections"
+          class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition text-xs font-medium"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <!-- Sorting & Display Controls -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center space-x-2">
+          <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Sort By:</label>
+          <select 
+            id="sortSelect" 
+            class="bg-dark-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-rose-500"
+          >
+            <option value="score_desc">Demand Score (High to Low)</option>
+            <option value="offers_desc">Offers Count (High to Low)</option>
+            <option value="bags_desc">In-Bags Count (High to Low)</option>
+            <option value="likes_desc">Likes (High to Low)</option>
+            <option value="price_asc">Price (Low to High)</option>
+            <option value="price_desc">Price (High to Low)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center space-x-2 border-l border-slate-800 pl-3">
+          <button 
+            id="exportCsvBtn" 
+            class="px-3 py-2 text-xs font-medium rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+          >
+            CSV
+          </button>
+          <button 
+            id="exportJsonBtn" 
+            class="px-3 py-2 text-xs font-medium rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+          >
+            JSON
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Products Grid -->
+    <section>
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="gridHeading" class="text-base font-semibold text-white flex items-center gap-2">
+          <span>Products</span>
+          <span id="itemCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">0 items</span>
+        </h2>
+        <input 
+          type="text" 
+          id="clientSearchInput" 
+          placeholder="Filter by title or brand..." 
+          class="bg-dark-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none w-52"
+        >
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden text-center py-20 bg-dark-900/40 rounded-2xl border border-slate-800/80">
+        <h3 class="text-lg font-semibold text-white">No products found</h3>
+        <p class="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
+          Start a new search above or select another saved collection from the dropdown.
+        </p>
+      </div>
+
+      <!-- Cards Grid Container -->
+      <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+        <!-- Rendered dynamically by JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition duration-300 pointer-events-none">
+    <div id="toastContent" class="bg-slate-800 text-white px-4 py-3 rounded-xl border border-slate-700 shadow-2xl flex items-center gap-3 text-sm">
+      <span id="toastText">Notification</span>
+    </div>
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    let currentProducts = [];
+
+    // Elements
+    const scrapeForm = document.getElementById('scrapeForm');
+    const queryInput = document.getElementById('queryInput');
+    const topInput = document.getElementById('topInput');
+    const minLikesInput = document.getElementById('minLikesInput');
+    const testModeInput = document.getElementById('testModeInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const statusMessage = document.getElementById('statusMessage');
+    const globalStats = document.getElementById('globalStats');
+    const collectionSelect = document.getElementById('collectionSelect');
+    const refreshCollectionsBtn = document.getElementById('refreshCollectionsBtn');
+    const sortSelect = document.getElementById('sortSelect');
+    const clientSearchInput = document.getElementById('clientSearchInput');
+    const productsGrid = document.getElementById('productsGrid');
+    const emptyState = document.getElementById('emptyState');
+    const itemCountBadge = document.getElementById('itemCountBadge');
+    const gridHeading = document.getElementById('gridHeading');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const exportJsonBtn = document.getElementById('exportJsonBtn');
+
+    // Toast helper
+    function showToast(text) {
+      const toast = document.getElementById('toast');
+      const toastText = document.getElementById('toastText');
+      toastText.innerText = text;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    // Load available collections from SQLite
+    async function loadCollections() {
+      try {
+        const res = await fetch('/api/collections');
+        const collections = await res.json();
+        collectionSelect.innerHTML = '<option value="">-- All Saved Collections --</option>';
+        collections.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.search_query;
+          opt.textContent = `${c.search_query} (${c.count} items)`;
+          collectionSelect.appendChild(opt);
+        });
+      } catch (err) {
+        console.error('Failed to load collections:', err);
+      }
+    }
+
+    // Load products by collection query
+    async function loadProducts(query = '') {
+      try {
+        let url = '/api/products?limit=200';
+        if (query) url += `&query=${encodeURIComponent(query)}`;
+        const res = await fetch(url);
+        currentProducts = await res.json();
+        renderProducts();
+      } catch (err) {
+        console.error('Failed to load products:', err);
+      }
+    }
+
+    // Render cards
+    function renderProducts() {
+      let filtered = [...currentProducts];
+
+      // Client-side text filter
+      const filterText = clientSearchInput.value.toLowerCase().trim();
+      if (filterText) {
+        filtered = filtered.filter(p => 
+          (p.title && p.title.toLowerCase().includes(filterText)) ||
+          (p.brand_name && p.brand_name.toLowerCase().includes(filterText))
+        );
+      }
+
+      // Sort
+      const sortBy = sortSelect.value;
+      filtered.sort((a, b) => {
+        if (sortBy === 'score_desc') return (b.demand_score || 0) - (a.demand_score || 0);
+        if (sortBy === 'offers_desc') return (b.offers_count || 0) - (a.offers_count || 0);
+        if (sortBy === 'bags_desc') return (b.in_bags_count || 0) - (a.in_bags_count || 0);
+        if (sortBy === 'likes_desc') return (b.like_count || 0) - (a.like_count || 0);
+        if (sortBy === 'price_asc') return (a.price || 0) - (b.price || 0);
+        if (sortBy === 'price_desc') return (b.price || 0) - (a.price || 0);
+        return 0;
+      });
+
+      itemCountBadge.textContent = `${filtered.length} items`;
+
+      if (filtered.length === 0) {
+        productsGrid.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      productsGrid.innerHTML = filtered.map((p, idx) => `
+        <article class="group bg-dark-900 rounded-2xl border border-slate-800 overflow-hidden hover:border-slate-700 hover:shadow-2xl hover:shadow-rose-950/20 flex flex-col justify-between transition">
+          <div>
+            <!-- Image & Badges -->
+            <div class="relative overflow-hidden bg-slate-950">
+              <img 
+                src="${p.image_url || 'https://via.placeholder.com/400?text=No+Image'}" 
+                alt="${p.title || 'Depop product'}"
+                loading="lazy"
+                onerror="this.src='https://via.placeholder.com/400?text=Image+Unavailable'"
+                class="product-img w-full group-hover:scale-105 transition duration-300"
+              />
+              
+              <!-- Demand Score Badge (Top Right) -->
+              <div class="absolute top-3 right-3 bg-dark-900/90 backdrop-blur border border-amber-500/30 text-amber-300 text-xs font-bold px-2.5 py-1 rounded-xl shadow">
+                Score: ${Number(p.demand_score || 0).toFixed(1)}
+              </div>
+
+              <!-- Metrics Pills Overlay (Bottom Left) -->
+              <div class="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
+                ${(p.offers_count > 0) ? `
+                  <span class="bg-rose-900/90 backdrop-blur border border-rose-500/40 text-rose-200 text-xs font-semibold px-2 py-0.5 rounded-lg shadow">
+                    ${p.offers_count} Offers
+                  </span>
+                ` : ''}
+                ${(p.in_bags_count > 0) ? `
+                  <span class="bg-indigo-900/90 backdrop-blur border border-indigo-500/40 text-indigo-200 text-xs font-semibold px-2 py-0.5 rounded-lg shadow">
+                    ${p.in_bags_count} In Bags
+                  </span>
+                ` : ''}
+                <span class="bg-slate-900/90 backdrop-blur border border-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-lg shadow">
+                  ${p.like_count || 0} Likes
+                </span>
+              </div>
+            </div>
+
+            <!-- Card Content -->
+            <div class="p-4 space-y-2">
+              <div class="flex items-baseline justify-between">
+                <span class="text-lg font-bold text-emerald-400">
+                  ${Number(p.price || 0).toFixed(2)} ${p.currency || 'USD'}
+                </span>
+                ${p.brand_name ? `
+                  <span class="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700/60 truncate max-w-[120px]">
+                    ${p.brand_name}
+                  </span>
+                ` : ''}
+              </div>
+
+              <h3 class="text-xs font-medium text-slate-200 line-clamp-2 leading-relaxed" title="${p.title}">
+                ${p.title || 'Untitled Item'}
+              </h3>
+            </div>
+          </div>
+
+          <!-- Card Actions Footer -->
+          <div class="p-4 pt-0 border-t border-slate-800/60 mt-2 flex items-center justify-between gap-2">
+            <a 
+              href="${p.url}" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium py-2 px-3 rounded-xl border border-slate-700 transition"
+            >
+              View Item
+            </a>
+            <button 
+              onclick="copyToClipboard('${(p.title || '').replace(/'/g, "\\'")}')"
+              title="Copy Title for Sourcing"
+              class="px-2.5 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition text-xs font-medium"
+            >
+              Copy
+            </button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text);
+      showToast('Title copied to clipboard');
+    }
+
+    // Scrape form submit handler
+    scrapeForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const query = queryInput.value.trim();
+      const top = parseInt(topInput.value) || 20;
+      const minLikes = parseInt(minLikesInput.value) || 5;
+      const testMode = testModeInput.checked;
+
+      // Set Loading UI
+      submitBtn.disabled = true;
+      btnText.innerText = 'Scraping...';
+      statusMessage.classList.remove('hidden');
+      globalStats.innerText = 'Scraping in progress...';
+
+      try {
+        const response = await fetch('/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: query,
+            top_n: top,
+            min_likes: minLikes,
+            test_mode: testMode
+          })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          showToast(`Scraped ${data.length} products`);
+          currentProducts = data;
+          await loadCollections();
+          collectionSelect.value = query;
+          renderProducts();
+        } else {
+          showToast(`Error: ${data.detail || 'Scraping failed'}`);
+        }
+      } catch (err) {
+        showToast('Request error: ' + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        btnText.innerText = 'Start Scraping';
+        statusMessage.classList.add('hidden');
+        globalStats.innerText = `Idle (${currentProducts.length} items loaded)`;
+      }
+    });
+
+    // Collection selection change
+    collectionSelect.addEventListener('change', () => {
+      const q = collectionSelect.value;
+      loadProducts(q);
+    });
+
+    refreshCollectionsBtn.addEventListener('click', () => {
+      loadCollections();
+      showToast('Collections refreshed');
+    });
+
+    sortSelect.addEventListener('change', renderProducts);
+    clientSearchInput.addEventListener('input', renderProducts);
+
+    // Export Handlers
+    exportJsonBtn.addEventListener('click', () => {
+      if (!currentProducts.length) return showToast('No items to export');
+      const blob = new Blob([JSON.stringify(currentProducts, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `depop_export_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    exportCsvBtn.addEventListener('click', () => {
+      if (!currentProducts.length) return showToast('No items to export');
+      const keys = ['id', 'title', 'price', 'currency', 'offers_count', 'in_bags_count', 'like_count', 'demand_score', 'brand_name', 'url', 'image_url', 'scraped_at'];
+      const rows = [keys.join(',')];
+      currentProducts.forEach(p => {
+        const row = keys.map(k => `"${String(p[k] || '').replace(/"/g, '""')}"`);
+        rows.push(row.join(','));
+      });
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `depop_export_${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Initial Load
+    window.addEventListener('DOMContentLoaded', async () => {
+      await loadCollections();
+      await loadProducts();
+      globalStats.innerText = `Loaded (${currentProducts.length} items)`;
+    });
+  </script>
+</body>
+</html>

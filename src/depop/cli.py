@@ -31,20 +31,40 @@ def print_summary_table(products):
         print("\nNo products found matching criteria.")
         return
 
+    # Ensure stdout handles non-ASCII characters on Windows consoles
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     print("\n" + "=" * 105)
     print(
         f"{'#':<3} | {'SCORE':<6} | {'OFFERS':<6} | {'BAGS':<4} | {'LIKES':<5} | {'PRICE':<8} | {'TITLE':<45} | {'URL'}"
     )
     print("-" * 105)
     for i, p in enumerate(products, 1):
-        title = (p.title[:42] + "...") if len(p.title) > 45 else p.title
-        print(
-            f"{i:<3} | {p.demand_score:<6.1f} | {p.offers_count:<6} | {p.in_bags_count:<4} | {p.like_count:<5} | {f'{p.price:.2f} {p.currency}':<8} | {title:<45} | {p.url}"
-        )
+        clean_title = p.title.replace("\n", " ").strip()
+        title = (clean_title[:42] + "...") if len(clean_title) > 45 else clean_title
+        try:
+            print(
+                f"{i:<3} | {p.demand_score:<6.1f} | {p.offers_count:<6} | {p.in_bags_count:<4} | {p.like_count:<5} | {f'{p.price:.2f} {p.currency}':<8} | {title:<45} | {p.url}"
+            )
+        except UnicodeEncodeError:
+            safe_title = title.encode("ascii", errors="replace").decode("ascii")
+            print(
+                f"{i:<3} | {p.demand_score:<6.1f} | {p.offers_count:<6} | {p.in_bags_count:<4} | {p.like_count:<5} | {f'{p.price:.2f} {p.currency}':<8} | {safe_title:<45} | {p.url}"
+            )
     print("=" * 105 + "\n")
 
 
 def main():
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     parser = argparse.ArgumentParser(
         description="Depop Scraper for dropshipping demand analysis (Likes, Offers, In-bag counts)."
     )
@@ -77,8 +97,8 @@ def main():
         "--pages",
         "-p",
         type=int,
-        default=3,
-        help="Maximum search pages to paginate through (default: 3).",
+        default=None,
+        help="Maximum search pages to paginate through (default: dynamic based on --top).",
     )
     parser.add_argument(
         "--verbose",

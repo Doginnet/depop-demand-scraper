@@ -8,7 +8,7 @@ class Config:
     search_api_url: str = "https://www.depop.com/presentation/api/v1/search/products/"
     impersonate_target: str = "chrome124"
 
-    headers: dict = field(
+    api_headers: dict = field(
         default_factory=lambda: {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en-US,en;q=0.9",
@@ -22,6 +22,26 @@ class Config:
             "sec-fetch-site": "same-site",
         }
     )
+
+    html_headers: dict = field(
+        default_factory=lambda: {
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "accept-language": "en-US,en;q=0.9",
+            "referer": "https://www.depop.com/",
+            "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-user": "?1",
+            "upgrade-insecure-requests": "1",
+        }
+    )
+
+    @property
+    def headers(self) -> dict:
+        return self.api_headers
 
     # Scraper thresholds & defaults
     default_limit: int = 160

@@ -1,7 +1,7 @@
 [project]
 name = "depop"
 version = "0.1.0"
-description = "Add your description here"
+description = "High-performance Depop market intelligence and demand analysis engine"
 readme = "README.md"
 authors = [
     { name = "Paprika", email = "doginnet@gmail.com" }
@@ -9,13 +9,27 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "curl-cffi>=0.16.3",
+    "fastapi>=0.143.0",
     "loguru>=0.7.3",
     "pydantic>=2.13.5",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
 depop = "depop:main"
+depop-ui = "depop.ui:start"
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "network: tests that make live network calls to Depop",
+]

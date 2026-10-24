@@ -62,6 +62,15 @@ class ProductItem(BaseModel):
                 image_url = formats[fmt_key]["url"]
                 break
 
+        if not image_url:
+            pictures = obj.get("pictures") or []
+            if pictures and isinstance(pictures[0], dict):
+                pic_formats = pictures[0].get("formats") or {}
+                for fmt_key in ["P0", "P8", "P7", "P1"]:
+                    if fmt_key in pic_formats and pic_formats[fmt_key].get("url"):
+                        image_url = pic_formats[fmt_key]["url"]
+                        break
+
         return cls(
             id=obj.get("id", 0),
             slug=slug,

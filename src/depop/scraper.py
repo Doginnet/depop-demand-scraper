@@ -31,7 +31,7 @@ class DepopScraper:
         query: str,
         min_likes: int | None = None,
         top_n: int | None = None,
-        max_pages: int = 3,
+        max_pages: int | None = None,
         test_mode: bool = False,
     ) -> list[ProductItem]:
         min_likes = (
@@ -41,8 +41,16 @@ class DepopScraper:
         )
         top_n = top_n if top_n is not None else self.config.default_top_n
 
+        # If user explicitly provided max_pages, use it. Otherwise, calculate a smart ceiling
+        if test_mode:
+            pages_ceiling = 1
+        elif max_pages is not None:
+            pages_ceiling = max_pages
+        else:
+            pages_ceiling = max(5, min(12, (top_n // 4) + 2))
+
         logger.info(
-            f"=== Starting Depop Scraper for query: '{query}' (test_mode={test_mode}, min_likes={min_likes}, top_n={top_n}) ==="
+            f"=== Starting Depop Scraper for query: '{query}' (test_mode={test_mode}, min_likes={min_likes}, top_n={top_n}, max_pages={pages_ceiling}) ==="
         )
 
         candidates: list[ProductItem] = []
@@ -51,10 +59,10 @@ class DepopScraper:
             # 1. Collect search results from API
             cursor = ""
             limit = 16 if test_mode else self.config.default_limit
-            pages_to_fetch = 1 if test_mode else max_pages
 
-            for page in range(1, pages_to_fetch + 1):
-                logger.info(f"Fetching search results page {page}...")
+            page = 1
+            while page <= pages_ceiling:
+                logger.info(f"Fetching search results page {page}/{pages_ceiling}...")
                 objects, meta = client.search(
                     query=query, limit=limit, cursor=cursor
                 )
@@ -70,7 +78,17 @@ class DepopScraper:
 
                 if test_mode or not meta.has_more or not meta.cursor:
                     break
+
+                # Stop early if we already have enough candidate items meeting min_likes
+                qualified_count = sum(1 for p in candidates if p.like_count >= min_likes)
+                if not test_mode and max_pages is None and qualified_count >= int(top_n * 1.25):
+                    logger.info(
+                        f"Collected {qualified_count} candidate items meeting min_likes={min_likes}. Sufficient for top-{top_n}."
+                    )
+                    break
+
                 cursor = meta.cursor
+                page += 1
 
             logger.info(f"Total raw items collected from search: {len(candidates)}")
 
@@ -78,19 +96,22 @@ class DepopScraper:
             if test_mode:
                 filtered_candidates = candidates
             else:
-                filtered_candidates = [
-                    p for p in candidates if p.like_count >= min_likes
-                ]
-                # If no products meet the threshold, fallback to top products by likes
-                if not filtered_candidates and candidates:
-                    logger.warning(
-                        f"No products found with >= {min_likes} likes. Falling back to top {top_n} products by likes."
+                qualified = [p for p in candidates if p.like_count >= min_likes]
+                # If qualified is less than top_n, backfill with remaining best candidates by likes
+                if len(qualified) < top_n and len(candidates) > len(qualified):
+                    remaining = [p for p in candidates if p.like_count < min_likes]
+                    remaining.sort(key=lambda x: x.like_count, reverse=True)
+                    needed = top_n - len(qualified)
+                    backfill = remaining[:needed]
+                    logger.info(
+                        f"Found {len(qualified)} items with >= {min_likes} likes. Adding {len(backfill)} next best items by likes to ensure top-{top_n} selection."
                     )
-                    candidates.sort(key=lambda x: x.like_count, reverse=True)
-                    filtered_candidates = candidates[:top_n]
+                    filtered_candidates = qualified + backfill
+                else:
+                    filtered_candidates = qualified
 
             # To stay lightweight and polite, cap candidate enrichment pool
-            enrichment_limit = 16 if test_mode else max(top_n * 2, 30)
+            enrichment_limit = 16 if test_mode else max(top_n, 40)
             if len(filtered_candidates) > enrichment_limit:
                 filtered_candidates.sort(key=lambda x: x.like_count, reverse=True)
                 filtered_candidates = filtered_candidates[:enrichment_limit]
