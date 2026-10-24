@@ -63,6 +63,7 @@ logs/
 raw/*.json
 raw/*.html
 !raw/.gitkeep
+proxies.txt
 
 # ==============================================================================
 # IDEs & Text Editors

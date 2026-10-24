@@ -5,39 +5,59 @@ from curl_cffi import requests
 from loguru import logger
 
 from depop.config import Config, default_config
+from depop.proxy import ProxyRotator
 from depop.schemas import SearchResponseMeta
 
 
 class DepopClient:
-    """Lightweight HTTP client for Depop with browser impersonation and polite rate-limiting."""
+    """Lightweight HTTP client for Depop with browser impersonation, proxy rotation, and polite rate-limiting."""
 
     def __init__(self, config: Config = default_config):
         self.config = config
+        self.proxy_rotator = ProxyRotator(
+            proxies=self.config.proxies,
+            file_path=self.config.proxy_file,
+            strategy=self.config.proxy_strategy,
+        )
         self.session = requests.Session(impersonate=self.config.impersonate_target)
         self._warmed_up = False
+
+        if self.proxy_rotator.is_enabled:
+            logger.info(
+                f"Proxy rotator initialized with {self.proxy_rotator.total_count} proxies (strategy: {self.config.proxy_strategy})."
+            )
+
+    def _get_proxy_kwargs(self) -> tuple[dict, str | None]:
+        proxy = self.proxy_rotator.get_proxy()
+        return ({"proxy": proxy} if proxy else {}), proxy
 
     def warm_up(self) -> bool:
         """Warm up session cookies and TLS context against the main domain."""
         if self._warmed_up:
             return True
         for attempt in range(1, 3):
+            proxy_kwargs, proxy = self._get_proxy_kwargs()
             try:
                 logger.info(f"Warming up Depop session (attempt {attempt})...")
                 resp = self.session.get(
                     self.config.base_url,
                     headers=self.config.html_headers,
                     timeout=15,
+                    **proxy_kwargs,
                 )
                 if resp.status_code == 200:
                     self._warmed_up = True
+                    self.proxy_rotator.report_success(proxy)
                     logger.info("Session warmed up successfully.")
                     return True
                 else:
+                    self.proxy_rotator.report_failure(proxy)
                     logger.warning(
                         f"Warm-up returned status {resp.status_code}. Retrying in 1.5s..."
                     )
                     time.sleep(1.5)
             except Exception as e:
+                self.proxy_rotator.report_failure(proxy)
                 logger.error(f"Warm-up request failed: {e}")
                 time.sleep(1.5)
         return False
@@ -77,11 +97,13 @@ class DepopClient:
         )
 
         for attempt in range(1, 4):
+            proxy_kwargs, proxy = self._get_proxy_kwargs()
             try:
                 resp = self.session.get(
-                    url, headers=self.config.api_headers, timeout=20
+                    url, headers=self.config.api_headers, timeout=20, **proxy_kwargs
                 )
                 if resp.status_code == 200:
+                    self.proxy_rotator.report_success(proxy)
                     data = resp.json()
                     objects = data.get("objects", [])
                     meta_info = data.get("meta", {})
@@ -98,6 +120,7 @@ class DepopClient:
                     )
                     return objects, meta
                 elif resp.status_code in (403, 429):
+                    self.proxy_rotator.report_failure(proxy)
                     logger.warning(
                         f"Search API returned {resp.status_code} (attempt {attempt}/3). Backing off for {attempt * 2.0}s..."
                     )
@@ -105,11 +128,13 @@ class DepopClient:
                     self._warmed_up = False
                     self.warm_up()
                 else:
+                    self.proxy_rotator.report_failure(proxy)
                     logger.error(
                         f"Search API returned status {resp.status_code}: {resp.text[:200]}"
                     )
                     break
             except Exception as e:
+                self.proxy_rotator.report_failure(proxy)
                 logger.error(f"Search request attempt {attempt} failed: {e}")
                 time.sleep(attempt * 1.5)
 
@@ -127,23 +152,28 @@ class DepopClient:
 
         logger.debug(f"Fetching product page HTML: {url}")
         for attempt in range(1, 3):
+            proxy_kwargs, proxy = self._get_proxy_kwargs()
             try:
                 resp = self.session.get(
-                    url, headers=self.config.html_headers, timeout=15
+                    url, headers=self.config.html_headers, timeout=15, **proxy_kwargs
                 )
                 if resp.status_code == 200:
+                    self.proxy_rotator.report_success(proxy)
                     return resp.text
                 elif resp.status_code in (403, 429):
+                    self.proxy_rotator.report_failure(proxy)
                     logger.warning(
                         f"Product page {url} returned status {resp.status_code} (attempt {attempt}). Retrying..."
                     )
                     time.sleep(attempt * 1.5)
                 else:
+                    self.proxy_rotator.report_failure(proxy)
                     logger.warning(
                         f"Product page {url} returned status {resp.status_code}"
                     )
                     break
             except Exception as e:
+                self.proxy_rotator.report_failure(proxy)
                 logger.error(f"Failed to fetch product HTML for {url}: {e}")
                 time.sleep(1.0)
 

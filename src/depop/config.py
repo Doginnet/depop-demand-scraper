@@ -62,5 +62,10 @@ class Config:
     db_path: Path = Path("output/depop.db")
     raw_dir: Path = Path("raw")
 
+    # Proxy settings
+    proxies: list[str] = field(default_factory=list)
+    proxy_file: Path | None = None
+    proxy_strategy: str = "round_robin"  # "round_robin" or "random"
+
 
 default_config = Config()

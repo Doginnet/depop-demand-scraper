@@ -106,12 +106,30 @@ def main():
         action="store_true",
         help="Enable detailed debug logging.",
     )
+    parser.add_argument(
+        "--proxy",
+        type=str,
+        default=None,
+        help="Single proxy URL or string (e.g. 'http://user:pass@host:port' or 'host:port').",
+    )
+    parser.add_argument(
+        "--proxies-file",
+        type=str,
+        default=None,
+        help="Path to text file containing proxies (one per line).",
+    )
 
     args = parser.parse_args()
 
     setup_logger(verbose=args.verbose)
 
-    config = Config()
+    proxies = [args.proxy] if args.proxy else []
+    proxy_file = Path(args.proxies_file) if args.proxies_file else None
+
+    config = Config(
+        proxies=proxies,
+        proxy_file=proxy_file,
+    )
     scraper = DepopScraper(config=config)
 
     top_items = scraper.run(

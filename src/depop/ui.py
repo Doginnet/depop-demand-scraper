@@ -23,6 +23,7 @@ class ScrapeRequest(BaseModel):
     top_n: int = 20
     min_likes: int = 5
     test_mode: bool = False
+    proxy: str | None = None
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -61,7 +62,8 @@ async def api_scrape(req: ScrapeRequest):
     )
 
     try:
-        scraper = DepopScraper(config=default_config)
+        config = Config(proxies=[req.proxy]) if req.proxy else default_config
+        scraper = DepopScraper(config=config)
         # Run blocking scraping operation in executor thread to keep server responsive
         loop = asyncio.get_event_loop()
         results = await loop.run_in_executor(

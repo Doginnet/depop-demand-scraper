@@ -1,0 +1,13 @@
+# List your proxies here, one per line.
+# Lines starting with '#' or empty lines will be ignored.
+#
+# Supported formats:
+# http://username:password@host:port
+# socks5://username:password@host:port
+# host:port:username:password
+# host:port
+#
+# Examples:
+# http://user123:pass456@192.168.1.100:8080
+# 192.168.1.101:8080:myuser:mypassword
+# 192.168.1.102:3128

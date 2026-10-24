@@ -76,6 +76,12 @@ Rather than scraping product pages indiscriminately, Stage 1 collects up to 160 
 - Total web layer footprint: **<5MB**. Startup time: **<300ms**.
 - Bundled with a 1-click launcher ([`start.bat`](file:///start.bat)) that initializes the server and automatically pops open the default web browser.
 
+### 5. Resilient Proxy Rotation & Health Quarantine (Optional)
+- Built-in thread-safe proxy management ([`src/depop/proxy.py`](file:///src/depop/proxy.py)) supporting **Round-Robin** and **Random** rotation across HTTP, HTTPS, and SOCKS5 proxies.
+- Auto-normalization of popular proxy formats (`http://user:pass@host:port`, `host:port:user:pass`, `host:port`).
+- Consecutive failure quarantine: automatically isolates failing nodes to prevent cascading 429/403 blocks.
+- Zero-overhead direct mode: defaults seamlessly to direct connection when no proxy is configured.
+
 ---
 
 ## Weighted Demand Scoring Model
@@ -152,15 +158,18 @@ depop/
 │   ├── schemas.py           # Strict Pydantic v2 data models with fallback extractors
 │   ├── client.py            # curl_cffi session, TLS impersonation, API pagination
 │   ├── extractor.py         # Next.js 14 RSC stream reconstructor & AST nudge parser
+│   ├── proxy.py             # Thread-safe proxy rotator, format normalizer & quarantine
 │   ├── storage.py           # SQLite UPSERT repository, JSON & CSV exporters
 │   ├── scraper.py           # Two-stage pipeline orchestrator with candidate backfill
 │   ├── ui.py                # FastAPI dashboard server & REST API
 │   └── cli.py               # CLI interface with UTF-8 Windows terminal support
 ├── tests/
 │   ├── test_e2e.py          # End-to-end integration & unit test suite
+│   ├── test_proxy.py        # Proxy rotator, normalization, and failure recovery tests
 │   └── test_ui.py           # FastAPI endpoint tests via TestClient
 ├── output/                  # Generated SQLite database, CSVs, and JSONs (git-ignored)
 ├── logs/                    # Rotating log files (git-ignored)
+├── proxies.example.txt      # Example proxy file template
 ├── start.bat                # 1-Click Windows launcher (auto-starts browser)
 ├── run_ui.py                # Standalone Python entrypoint for Web UI
 ├── main.py                  # CLI entrypoint
@@ -222,6 +231,8 @@ uv run depop "vintage leather jacket" --test
 | `--top` | — | `int` | `20` | Exact number of top-demand products to return and export. |
 | `--pages` | `-p` | `int` | `3` | Maximum number of search API pages to retrieve (160 items/page). |
 | `--verbose` | `-v` | `flag` | `False` | Enable detailed debug logs (request headers, chunk traces). |
+| `--proxy` | — | `str` | `None` | Optional single proxy URL (e.g. `http://user:pass@host:port` or `host:port`). |
+| `--proxies-file` | — | `str` | `None` | Optional path to text file containing a list of proxies (one per line). |
 
 ---
 
